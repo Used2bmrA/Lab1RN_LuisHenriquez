@@ -56,13 +56,13 @@ def cargarModelo(path):
     # "input_shape" es una tupla (n_entrada,) y "scale" es un float.
     
     with open(path, encoding="utf-8") as f:
-        config = json.load(f)
-    
-    input_shape = tuple(config["input_shape"])
-    scale = float(config["preprocess"]["scale"])
+        modelo_json = json.load(f)
+
+    input_shape = tuple(modelo_json["input_shape"])
+    scale = float(modelo_json["preprocess"]["scale"])
 
     layers = []                                                     # Lista de capas (pesos, sesgos y activaciones)
-    for layer_cfg in config["layers"]:
+    for layer_cfg in modelo_json["layers"]:
         layers.append(LayerDense(layer_cfg["W"], layer_cfg["b"]))   # Pesos y sesgo
         layers.append(ACTIVACIONES[layer_cfg["activation"]]())      # Función de activación
 
@@ -73,10 +73,26 @@ def resumenModelo(layers, input_shape, scale):
     print(f"  input_shape = {input_shape}, scale = {scale}")
     dense_layers = [layer for layer in layers if isinstance(layer, LayerDense)]
     activations = [layer for layer in layers if not isinstance(layer, LayerDense)]
-    for i, (dense, activation) in enumerate(zip(dense_layers, activations), start=1):
+    for i, (dense, activation) in enumerate(zip(dense_layers, activations), start=1):   # Comienza desde 1 porque la capa 0 es la de entrada
         print(f"  Capa {i}: tipo=dense, unidades={dense.weights.shape[1]}, "
               f"activacion={type(activation).__name__}, "
               f"W={dense.weights.shape}, b={dense.biases.shape}")
+
+# ---------------------------------------------------------------------------
+# Preprocesamiento de datos
+# ---------------------------------------------------------------------------
+def load_test_data(path, scale):
+    data = np.load(path)
+    images, labels = data["images"], data["labels"]
+
+    #print(data.files)                                  # ['images', 'labels']
+    #for key in data.files:
+    #   print(key, data[key].shape, data[key].dtype)    # images (10000, 28, 28) uint8, labels (10000,) uint8
+
+    X = images.astype(np.float64) / scale          # normalizacion [0,1]
+    X = X.reshape(X.shape[0], -1)                  # aplanamiento -> (10000, 784)
+    y = labels.astype(np.int64)                    # 10,000 etiquetas como enteros (0-9)
+    return X, y
 
 def main():
     # 1) Cargar e inspeccionar el modelo
@@ -85,6 +101,17 @@ def main():
     print("=" * 70)
     layers, input_shape, scale = cargarModelo(MODEL_PATH)
     resumenModelo(layers, input_shape, scale)
+
+    # 2) Cargar y preparar el conjunto de prueba
+    print("\n" + "=" * 70)
+    print("2) Cargando y preprocesando datos de prueba")
+    print("=" * 70)
+    X, y = load_test_data(DATA_PATH, scale)
+    print("'X' es un arreglo de imágenes aplanadas y 'y' es un arreglo de etiquetas sobre el número que representa la imagen (0-9).")
+    print(f"  X: {X.shape}, dtype={X.dtype}")
+    print(f"  y: {y.shape}, dtype={y.dtype}")
+    
+    images_raw = np.load(DATA_PATH)["images"]
 
 if __name__ == "__main__":
     main()
