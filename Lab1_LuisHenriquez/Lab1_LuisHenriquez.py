@@ -13,8 +13,7 @@ DATA_PATH = os.path.join(SCRIPT_DIR, "..", "Starter-Files", "mnist_test.npz")   
 # ---------------------------------------------------------------------------
 # Capa densa
 # ---------------------------------------------------------------------------
-class LayerDense:
-    
+class LayerDense:    
     def __init__(self, W, b):
         self.weights = np.asarray(W, dtype=np.float64)
         self.biases = np.asarray(b, dtype=np.float64)
@@ -32,7 +31,6 @@ class ActivationReLU:
         self.output = np.maximum(0, input)
         return self.output
 
-
 class ActivationSoftmax:
     def forward(self, input):
         max = np.max(input, axis=1, keepdims=True)
@@ -41,14 +39,14 @@ class ActivationSoftmax:
         self.output = exp_values / np.sum(exp_values, axis=1, keepdims=True)
         return self.output
 
-# ---------------------------------------------------------------------------
-# Construccion de la red neuronal
-# ---------------------------------------------------------------------------
 ACTIVACIONES = {                     #Tipo de activaciones disponibles
     "relu": ActivationReLU,
     "softmax": ActivationSoftmax,
 }
 
+# ---------------------------------------------------------------------------
+# Construccion de la red neuronal
+# ---------------------------------------------------------------------------
 def cargarModelo(path):
     # Lee el JSON con pesos entrenados y arma la lista de capas.
     # Devuelve un dict con tres claves: "layers", "input_shape" y "scale".
@@ -78,6 +76,16 @@ def resumenModelo(layers, input_shape, scale):
               f"activacion={type(activation).__name__}, "
               f"W={dense.weights.shape}, b={dense.biases.shape}")
 
+class NeuralNetwork:
+    def __init__(self, layers: list):
+        self.layers = layers                    # lista de capas y activaciones en orden
+
+    def forward(self, inputs):
+        output = inputs
+        for layer in self.layers:
+            output = layer.forward(output)
+        return output
+
 # ---------------------------------------------------------------------------
 # Preprocesamiento de datos
 # ---------------------------------------------------------------------------
@@ -97,20 +105,42 @@ def load_test_data(path, scale):
 def main():
     # 1) Cargar e inspeccionar el modelo
     print("=" * 70)
-    print("1) Cargando modelo desde JSON")
+    print("1) Cargar e inspeccionar el modelo")
     print("=" * 70)
     layers, input_shape, scale = cargarModelo(MODEL_PATH)
     resumenModelo(layers, input_shape, scale)
 
-    # 2) Cargar y preparar el conjunto de prueba
+    # 2) Implementar la red neuronal
     print("\n" + "=" * 70)
-    print("2) Cargando y preprocesando datos de prueba")
+    print("2) Implementar la red neuronal")
+    print("=" * 70)
+    red = NeuralNetwork(layers)             # A partir de las capas leidas del JSON crea un objeto NeuralNetwork
+    print("Red neuronal construida a partir de las capas leidas del JSON.")
+
+    # 3) Cargar y preparar el conjunto de prueba
+    print("\n" + "=" * 70)
+    print("3) Cargar y preparar el conjunto de prueba")
     print("=" * 70)
     X, y = load_test_data(DATA_PATH, scale)
     print("'X' es un arreglo de imágenes aplanadas y 'y' es un arreglo de etiquetas sobre el número que representa la imagen (0-9).")
     print(f"  X: {X.shape}, dtype={X.dtype}")
     print(f"  y: {y.shape}, dtype={y.dtype}")
-    
+
+    # 4) Ejecutar inferencia y evaluar
+    print("\n" + "=" * 70)
+    print("4) Ejecutar inferencia y evaluar")
+    print("=" * 70)
+
+    print("4.1) Prediccion individual: se le da a la red 1 imagen para")
+    print("     verificar dimensiones de la salida y probabilidades de la inferencia.")
+    muestraIndividual = X[0:1] 
+    probsMuestra = red.forward(muestraIndividual)
+    print(f"  Etiqueta real: {y[0]}")
+    print("  Probabilidades por clase:")
+    for clase in range(10):
+        print(f"    clase {clase}: {probsMuestra[0, clase]:.4f}")
+    print(f"  Suma de probabilidades: {probsMuestra[0].sum():.6f}")
+
     images_raw = np.load(DATA_PATH)["images"]
 
 if __name__ == "__main__":
