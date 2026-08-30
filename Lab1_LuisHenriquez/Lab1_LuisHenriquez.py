@@ -97,6 +97,9 @@ def load_test_data(path, scale):
     #for key in data.files:
     #   print(key, data[key].shape, data[key].dtype)    # images (10000, 28, 28) uint8, labels (10000,) uint8
 
+    assert images.shape == (10000, 28, 28), f"forma inesperada de images: {images.shape}"
+    assert labels.shape == (10000,), f"forma inesperada de labels: {labels.shape}"
+
     X = images.astype(np.float64) / scale          # normalizacion [0,1]
     X = X.reshape(X.shape[0], -1)                  # aplanamiento -> (10000, 784)
     y = labels.astype(np.int64)                    # 10,000 etiquetas como enteros (0-9)
@@ -133,13 +136,28 @@ def main():
 
     print("4.1) Prediccion individual: se le da a la red 1 imagen para")
     print("     verificar dimensiones de la salida y probabilidades de la inferencia.")
-    muestraIndividual = X[0:1] 
+    muestraIndividual = X[0:1]
     probsMuestra = red.forward(muestraIndividual)
+    clasePredicha = np.argmax(probsMuestra[0])   # indice de la mayor probabilidad = digito predicho
+    print(f"  Clase predicha: {clasePredicha}")
     print(f"  Etiqueta real: {y[0]}")
     print("  Probabilidades por clase:")
     for clase in range(10):
         print(f"    clase {clase}: {probsMuestra[0, clase]:.4f}")
     print(f"  Suma de probabilidades: {probsMuestra[0].sum():.6f}")
+
+
+    print("\n" + "=" * 70)
+    print("4.2) Inferencia sobre las 10,000 imágenes de prueba y cálculo de exactitud")
+    print("=" * 70)
+    probsTotal = red.forward(X)
+    print(f"  Forma de la salida de todo el conjunto: {probsTotal.shape}")
+    sumas = probsTotal.sum(axis=1)
+    print(f"  Suma minima: {sumas.min():.6f}, suma maxima: {sumas.max():.6f}")
+
+    y_pred = np.argmax(probsTotal, axis=1)
+    accuracy = np.mean(y_pred == y) # proporcion de aciertos para las 10,000 imagenes
+    print(f"\n  Exactitud (accuracy) para el conjunto de prueba: {accuracy * 100:.2f} %")
 
     images_raw = np.load(DATA_PATH)["images"]
 
