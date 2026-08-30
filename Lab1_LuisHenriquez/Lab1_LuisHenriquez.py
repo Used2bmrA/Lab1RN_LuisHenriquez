@@ -11,70 +11,64 @@ MODEL_PATH = os.path.join(SCRIPT_DIR, "..", "Starter-Files", "mnist_mlp.json")  
 DATA_PATH = os.path.join(SCRIPT_DIR, "..", "Starter-Files", "mnist_test.npz")       # Path del dataset de prueba (imágenes y etiquetas)
 
 # ---------------------------------------------------------------------------
-# Capa densa
-# ---------------------------------------------------------------------------
-class LayerDense:    
-    def __init__(self, W, b):
-        self.weights = np.asarray(W, dtype=np.float64)
-        self.biases = np.asarray(b, dtype=np.float64)
-
-    def forward(self, inputs):
-        self.output = np.dot(inputs, self.weights) + self.biases
-        return self.output
-
-    
-# ---------------------------------------------------------------------------
 # Funciones de activacion
 # ---------------------------------------------------------------------------
-class ActivationReLU:
-    def forward(self, input):
-        self.output = np.maximum(0, input)
-        return self.output
+def relu(z):
+    return np.maximum(0, z)
 
-class ActivationSoftmax:
-    def forward(self, input):
-        max = np.max(input, axis=1, keepdims=True)
-        shifted = input - max
-        exp_values = np.exp(shifted)
-        self.output = exp_values / np.sum(exp_values, axis=1, keepdims=True)
-        return self.output
+def softmax(z):
+    max = np.max(z, axis=1, keepdims=True)
+    shifted = z - max
+    exp_values = np.exp(shifted)
+    return exp_values / np.sum(exp_values, axis=1, keepdims=True)
 
-ACTIVACIONES = {                     #Tipo de activaciones disponibles
-    "relu": ActivationReLU,
-    "softmax": ActivationSoftmax,
+ACTIVACIONES = {                     # Tipo de activaciones disponibles, por nombre
+    "relu": relu,
+    "softmax": softmax,
 }
+
+# ---------------------------------------------------------------------------
+# Capa densa
+# ---------------------------------------------------------------------------
+class LayerDense:
+    def __init__(self, W, b, activation):
+        self.weights = np.asarray(W, dtype=np.float64)
+        self.biases = np.asarray(b, dtype=np.float64)
+        self.activation = activation
+
+    def forward(self, inputs):
+        z = np.dot(inputs, self.weights) + self.biases
+        self.output = ACTIVACIONES[self.activation](z)
+        return self.output
 
 # ---------------------------------------------------------------------------
 # Construccion de la red neuronal
 # ---------------------------------------------------------------------------
 def cargarModelo(path):
     # Lee el JSON con pesos entrenados y arma la lista de capas.
-    # Devuelve un dict con tres claves: "layers", "input_shape" y "scale".
-    # "layers" es una lista de objetos LayerDense y Activation en orden.
-    # "input_shape" es una tupla (n_entrada,) y "scale" es un float.
-    
+    # Devuelve la lista de capas, el input_shape y el scale.
+    # "layers" es una lista de objetos LayerDense en orden, donde cada uno
+    # tiene sus pesos, sesgos y el nombre de su activación.
+
     with open(path, encoding="utf-8") as f:
         modelo_json = json.load(f)
 
     input_shape = tuple(modelo_json["input_shape"])
     scale = float(modelo_json["preprocess"]["scale"])
 
-    layers = []                                                     # Lista de capas (pesos, sesgos y activaciones)
+    layers = []                                                     # Lista de capas densas
     for layer_cfg in modelo_json["layers"]:
-        layers.append(LayerDense(layer_cfg["W"], layer_cfg["b"]))   # Pesos y sesgo
-        layers.append(ACTIVACIONES[layer_cfg["activation"]]())      # Función de activación
+        layers.append(LayerDense(layer_cfg["W"], layer_cfg["b"], layer_cfg["activation"]))
 
     return layers, input_shape, scale
 
 def resumenModelo(layers, input_shape, scale):
     print("Arquitectura de la red:")
     print(f"  input_shape = {input_shape}, scale = {scale}")
-    dense_layers = [layer for layer in layers if isinstance(layer, LayerDense)]
-    activations = [layer for layer in layers if not isinstance(layer, LayerDense)]
-    for i, (dense, activation) in enumerate(zip(dense_layers, activations), start=1):   # Comienza desde 1 porque la capa 0 es la de entrada
-        print(f"  Capa {i}: tipo=dense, unidades={dense.weights.shape[1]}, "
-              f"activacion={type(activation).__name__}, "
-              f"W={dense.weights.shape}, b={dense.biases.shape}")
+    for i, layer in enumerate(layers, start=1):
+        print(f"  Capa {i}: tipo=dense, neuronas={layer.weights.shape[1]}, "
+              f"activacion={layer.activation}, "
+              f"W={layer.weights.shape}, b={layer.biases.shape}")
 
 class NeuralNetwork:
     def __init__(self, layers: list):
@@ -125,6 +119,7 @@ def main():
     print("3) Cargar y preparar el conjunto de prueba")
     print("=" * 70)
     X, y = load_test_data(DATA_PATH, scale)
+    images_raw = np.load(DATA_PATH)["images"]
     print("'X' es un arreglo de imágenes aplanadas y 'y' es un arreglo de etiquetas sobre el número que representa la imagen (0-9).")
     print(f"  X: {X.shape}, dtype={X.dtype}")
     print(f"  y: {y.shape}, dtype={y.dtype}")
@@ -146,6 +141,14 @@ def main():
         print(f"    clase {clase}: {probsMuestra[0, clase]:.4f}")
     print(f"  Suma de probabilidades: {probsMuestra[0].sum():.6f}")
 
+    imagenOriginal = images_raw[0]
+    plt.imshow(imagenOriginal, cmap="gray")
+    plt.title(f"Etiqueta real: {y[0]} | Clase predicha: {clasePredicha}")
+    plt.axis("off")
+    rutaImagen = os.path.join(SCRIPT_DIR, "prediccion_individual.png")
+    plt.savefig(rutaImagen)
+    plt.close()
+    print(f"  Imagen guardada en: {rutaImagen}")
 
     print("\n" + "=" * 70)
     print("4.2) Inferencia sobre las 10,000 imágenes de prueba y cálculo de exactitud")
@@ -158,8 +161,6 @@ def main():
     y_pred = np.argmax(probsTotal, axis=1)
     accuracy = np.mean(y_pred == y) # proporcion de aciertos para las 10,000 imagenes
     print(f"\n  Exactitud (accuracy) para el conjunto de prueba: {accuracy * 100:.2f} %")
-
-    images_raw = np.load(DATA_PATH)["images"]
 
 if __name__ == "__main__":
     main()
